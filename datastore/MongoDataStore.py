@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any
 from logger.Logger import LOG
 from config.Config import MONGO_URL, DB_NAME, USERS_COLLECTION
 from exceptions.DataError import DataError
+import certifi
 
 
 class MongoDataStore:
@@ -20,13 +21,13 @@ class MongoDataStore:
         self.users = None
 
     async def init(self):
-        self.client = AsyncMongoClient(self.mongo_url)
+        self.client = AsyncMongoClient(self.mongo_url, tls=True, tlsCAFile=certifi.where())
         self.db = self.client[self.db_name]
         self.users = self.db[self.collection_name]
 
         # Ensure unique index for provider + social_id
         await self.users.create_index([("provider", ASCENDING), ("social_id", ASCENDING)], unique=True)
-        LOG.info("Connected to MongoDB at %s, DB: %s", self.mongo_url, self.db_name)
+        LOG.info(f"Connected to MongoDB, DB: {self.db_name}")
 
     async def get_user(self, provider: str, social_id: str) -> Optional[Dict[str, Any]]:
         return await self.users.find_one({"provider": provider, "social_id": social_id})
@@ -53,13 +54,13 @@ class MongoDataStore:
         try:
             result = await self.users.insert_one(doc)
             doc["_id"] = result.inserted_id
-            LOG.info("Inserted new user %s (%s)", social_id, provider)
+            LOG.info(f"Inserted new user {social_id} ({provider})")
             return doc
         except DuplicateKeyError:
             # Already exists, fetch existing
             existing = await self.get_user(provider, social_id)
-            LOG.info("User already exists %s (%s)", social_id, provider)
-            raise DataError("User already exists with name %s", existing.get("name") if existing else "unknown")
+            LOG.info(f"User already exists {social_id} ({provider})")
+            raise DataError(f"User already exists with name {existing.get('name') if existing else 'unknown'}")
 
     async def close(self):
         if self.client:

@@ -34,13 +34,13 @@ class TokenStore:
                 decode_responses=True,
                 ssl_ca_certs=certifi.where()
             )
-            LOG.info("Connected to Valkey at %s", self.redis_url)
+            LOG.info(f"Connected to Valkey at {self.redis_url}")
         else:
             # sqlite fallback
             db_path = SQLITE_PATH
             self._sqlite_conn = await aiosqlite.connect(db_path)
             await self._init_sqlite()
-            LOG.info("Using sqlite fallback at %s", db_path)
+            LOG.info(f"Using sqlite fallback at {db_path}")
 
     async def _init_sqlite(self):
         if self._sqlite_initialized:
@@ -63,7 +63,7 @@ class TokenStore:
                 self._kv.set(jti, payload_json, ex=ttl_seconds)
                 return
             except Exception as e:
-                LOG.error("Valkey set failed: %s", e)
+                LOG.error(f"Valkey set failed: {str(e)}")
                 raise TokenStoreError(e)
         else:
             try:
@@ -73,7 +73,7 @@ class TokenStore:
                 )
                 await self._sqlite_conn.commit()
             except Exception as e:
-                LOG.error("SQLite set failed: %s", e)
+                LOG.error(f"SQLite set failed: {str(e)}")
                 raise TokenStoreError(e)
 
     async def get(self, jti: str) -> Optional[Dict[str, Any]]:
@@ -84,7 +84,7 @@ class TokenStore:
                     return None
                 return json.loads(val)
             except Exception as e:
-                LOG.error("Valkey get failed: %s", e)
+                LOG.error(f"Valkey get failed: {str(e)}")
                 raise TokenStoreError(e)
         else:
             cur = await self._sqlite_conn.execute(

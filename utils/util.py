@@ -16,5 +16,5 @@ async def async_retry(func, *args, retries=3, backoff_factor=0.5, **kwargs):
             if attempt > retries:
                 raise
             sleep = backoff_factor * (2 ** (attempt - 1))
-            LOG.warning("Transient error calling %s: %s — retrying in %.2fs (attempt %d)", func.__name__, e, sleep, attempt)
+            LOG.warning(f"Transient error calling {func.__name__}: {str(e)} — retrying in {sleep}s (attempt {attempt})")
             await asyncio.sleep(sleep)

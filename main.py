@@ -64,6 +64,7 @@ async def init_services():
         if not initialized:
             LOG.info("Initializing token store and authenticator...")
             await token_store.init()
+            await mongo_store.init()
             initialized = True
     
 @asynccontextmanager
@@ -76,6 +77,7 @@ async def lifespan(app: FastAPI):
     LOG.info("Shutting down services...")
     await authenticator.close()
     await token_store.close()
+    await mongo_store.close()
     
 # ---------- FastAPI app ----------
 app = FastAPI(title="Simple Social Auth Service", lifespan=lifespan)
@@ -126,54 +128,8 @@ async def authenticate(req: AuthRequest):
         out = await authenticator.authenticate(provider, token)
         return AuthResponse(app_token=out["app_token"], claims=out["claims"])
     except ProviderValidationError as pve:
-        LOG.warning("Provider validation failed: %s", pve)
+        LOG.warning(f"Provider validation failed: {pve}")
         raise HTTPException(status_code=401, detail=f"Validation failed: {pve}")
     except Exception as e:
-        LOG.exception("Unexpected error during authentication: %s", e)
+        LOG.exception(f"Unexpected error during authentication: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
-
-# ---------- Example CLI / uv entrypoint ----------
-
-# async def main():
-#     """Main for local testing and as an entrypoint for uv runtimes.
-
-#     Example usage (dev):
-#       - set environment variables
-#       - run `python main.py`
-#       - the script will attempt to validate a token interactively
-
-#     In production, import Authenticator from this module and use in FastAPI endpoints.
-#     """
-#     LOG.info("Starting auth service (standalone). Initializing token store...")
-#     store = TokenStore(redis_url=REDIS_URL)
-#     await store.init()
-#     auth = Authenticator(token_store=store)
-
-#     try:
-#         # quick interactive test loop
-#         print("Simple Auth CLI — type 'quit' to exit")
-#         while True:
-#             provider = input("provider (facebook|twitter)> ").strip()
-#             if provider in ("", "quit", "exit"):
-#                 break
-#             token = input("social token> ").strip()
-#             if not token:
-#                 print("empty token")
-#                 continue
-#             try:
-#                 out = await auth.authenticate(provider, token)
-#                 print("OK — app_token (first 120 chars):", out["app_token"][:120])
-#                 print("claims:", json.dumps(out["claims"], indent=2))
-#             except ProviderValidationError as pve:
-#                 print("Validation failed:", pve)
-#             except Exception as e:
-#                 LOG.exception("Unexpected error during authentication: %s", e)
-#                 print("Error: ", e)
-#     finally:
-#         await auth.close()
-#         await store.close()
-#         LOG.info("Shutting down")
-
-
-# if __name__ == "__main__":
-#     asyncio.run(main())

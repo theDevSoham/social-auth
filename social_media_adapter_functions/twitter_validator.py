@@ -23,6 +23,7 @@ async def validate_twitter_token(token: str, session: Optional[aiohttp.ClientSes
     Raises:
         ProviderValidationError: If validation fails or response is malformed.
     """
+    params = ""
     headers = {"Authorization": f"Bearer {token}", "User-Agent": "auth-service/1.0"}
     timeout = aiohttp.ClientTimeout(total=10)
     should_close = False
@@ -36,7 +37,8 @@ async def validate_twitter_token(token: str, session: Optional[aiohttp.ClientSes
     try:
         # OAuth2 / v2 endpoint
         if TWITTER_OAUTH2_ENABLE:
-            url = "https://api.twitter.com/2/users/me"
+            params = "?user.fields=id,name,username,confirmed_email"
+            url = "https://api.twitter.com/2/users/me" + params
         else:
             # Fallback v1.1 endpoint
             url = "https://api.twitter.com/1.1/account/verify_credentials.json"
@@ -44,7 +46,7 @@ async def validate_twitter_token(token: str, session: Optional[aiohttp.ClientSes
         async with session.get(url, headers=headers, timeout=timeout) as resp:
             text = await resp.text()
             if resp.status != 200:
-                LOG.error("Twitter token validation failed: %s %s", resp.status, text)
+                LOG.error(f"Twitter token validation failed: {resp.status}, {text}")
                 raise ProviderValidationError(f"Twitter validation failed, status={resp.status}")
 
             data = await resp.json()
@@ -54,17 +56,25 @@ async def validate_twitter_token(token: str, session: Optional[aiohttp.ClientSes
                 if not user_data:
                     raise ProviderValidationError("Malformed Twitter response (missing data)")
                 uid = user_data.get("id")
-                if not uid:
-                    raise ProviderValidationError("Twitter response missing user ID")
-                return {"uid": str(uid), "raw": user_data}
+                email = user_data.get("confirmed_email")
+                if not uid or not email:
+                    raise ProviderValidationError("Twitter response missing user profile info")
+                return {
+					"uid": str(uid),
+					"name": user_data.get("name", ""),
+					"email": email,
+					"expires_at": "",
+					"scopes": [],
+					"raw": {"validation": user_data, "user": user_data},
+				}
             else:
                 uid = data.get("id_str") or data.get("id")
                 if not uid:
                     raise ProviderValidationError("Twitter response missing user ID")
-                return {"uid": str(uid), "raw": data}
+                
 
     except aiohttp.ClientError as e:
-        LOG.error("Twitter HTTP error: %s", e)
+        LOG.error(f"Twitter HTTP error: {str(e)}")
         raise ProviderValidationError(f"Twitter HTTP error: {e}")
 
     finally:

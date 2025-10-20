@@ -40,7 +40,7 @@ logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s %(levelname)s %(message
 # --------- DB config ----------
 MONGO_URL: str = os.getenv("MONGO_URL", "mongodb://localhost:27017")
 DB_NAME: str = os.getenv("MONGO_DB_NAME", "")
-USERS_COLLECTION: str = os.getenv("MONGO_DB_NAME", "")
+USERS_COLLECTION: str = os.getenv("USERS_COLLECTION", "")
 
 # ---------- Helper for Debug ----------
 def debug_print_config():
