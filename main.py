@@ -39,7 +39,6 @@ from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from exceptions import ProviderValidationError, TokenStoreError
 
 import asyncio
 
@@ -47,6 +46,7 @@ from config.Config import REDIS_URL, debug_print_config
 from exceptions import *
 from logger.Logger import LOG
 from token_store.TokenStore import TokenStore
+from datastore.MongoDataStore import MongoDataStore
 from authenticator.Authenticator import Authenticator
 
 # ---------- Request / Response Schemas ----------
@@ -95,9 +95,17 @@ async def token_store_exception_handler(request: Request, exc: TokenStoreError):
         content={"detail": f"Token store error: {str(exc)}"},
     )
 
+@app.exception_handler(DataError)
+async def data_exception_handler(request: Request, exc: DataError):
+    return JSONResponse(
+        status_code=400,
+        content={"detail": f"Data error: {str(exc)}"},
+    )
+
 # Single global instances (async init)
 token_store: TokenStore = TokenStore(redis_url=REDIS_URL)
-authenticator: Authenticator = Authenticator(token_store=token_store)
+mongo_store: MongoDataStore = MongoDataStore()
+authenticator: Authenticator = Authenticator(token_store=token_store, mongo_store=mongo_store)
 startup_lock = asyncio.Lock()
 initialized = False
 

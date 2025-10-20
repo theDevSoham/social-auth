@@ -37,6 +37,11 @@ SQLITE_PATH: str = os.getenv("SQLITE_PATH", ":memory:")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s %(levelname)s %(message)s")
 
+# --------- DB config ----------
+MONGO_URL: str = os.getenv("MONGO_URL", "mongodb://localhost:27017")
+DB_NAME: str = os.getenv("MONGO_DB_NAME", "")
+USERS_COLLECTION: str = os.getenv("MONGO_DB_NAME", "")
+
 # ---------- Helper for Debug ----------
 def debug_print_config():
     """Print current config values for debugging (masking secrets)."""
@@ -52,5 +57,8 @@ def debug_print_config():
     print(f"  REDIS_URL = {mask(REDIS_URL)}")
     print(f"  FACEBOOK_APP_ID = {mask(FACEBOOK_APP_ID)}")
     print(f"  FACEBOOK_APP_SECRET = {mask(FACEBOOK_APP_SECRET)}")
+    print(f"  MONGO_URL = {mask(MONGO_URL)}")
+    print(f"  DB_NAME = {mask(DB_NAME)}")
+    print(f"  USERS_COLLECTION = {mask(USERS_COLLECTION)}")
     print(f"  TWITTER_OAUTH2_ENABLE = {TWITTER_OAUTH2_ENABLE}")
     print(f"  SQLITE_PATH = {SQLITE_PATH}")

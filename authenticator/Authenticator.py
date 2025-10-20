@@ -5,6 +5,8 @@ from utils.http_client import get_aiohttp_session
 from typing import Dict, Any
 from exceptions import ProviderValidationError
 from social_media_adapter_functions import *
+from datastore.MongoDataStore import MongoDataStore
+from logger.Logger import LOG
 import uuid
 import jwt
 import time
@@ -13,8 +15,9 @@ import aiohttp
 # ---------- Authenticator ----------
 
 class Authenticator:
-    def __init__(self, token_store: TokenStore, jwt_secret: str = AUTH_JWT_SECRET, jwt_algo: str = AUTH_JWT_ALGORITHM, jwt_exp_seconds: int = AUTH_JWT_EXP_SECONDS):
+    def __init__(self, token_store: TokenStore, mongo_store: MongoDataStore, jwt_secret: str = AUTH_JWT_SECRET, jwt_algo: str = AUTH_JWT_ALGORITHM, jwt_exp_seconds: int = AUTH_JWT_EXP_SECONDS):
         self.token_store = token_store
+        self.mongo_store = mongo_store
         self.jwt_secret = jwt_secret
         self.jwt_algo = jwt_algo
         self.jwt_exp_seconds = jwt_exp_seconds
@@ -39,6 +42,13 @@ class Authenticator:
         uid = info.get("uid")
         if not uid:
             raise ProviderValidationError("Provider response missing uid")
+        
+         # ---------------- MongoDB user insert/upsert ----------------
+        name = info.get("name")
+        email = info.get("email")
+        extra = {k: v for k, v in info.items() if k not in ("uid", "name", "email")}
+        user_doc = await self.mongo_store.upsert_user(provider, uid, name=name, email=email, extra=extra)
+        LOG("User upserted/verified in MongoDB: %s", user_doc.get("_id"))
 
         # Create app JWT
         jti = str(uuid.uuid4())
