@@ -8,7 +8,10 @@ dependencies = [
     "aiohttp>=3.13.1",
     "aiosqlite>=0.21.0",
     "certifi>=2025.10.5",
+    "fastapi>=0.119.1",
+    "pydantic>=2.12.3",
     "pyjwt>=2.10.1",
     "python-dotenv>=1.1.1",
+    "uvicorn>=0.38.0",
     "valkey>=6.1.1",
 ]
