@@ -83,3 +83,19 @@ class Authenticator:
         await self.token_store.set(jti, store_payload, ttl_seconds=self.jwt_exp_seconds)
 
         return {"app_token": app_token, "claims": claims}
+    
+    async def verify_app_token(self, token: str):
+        """Verify and decode the issued JWT app token."""
+        try:
+            payload = jwt.decode(
+                token,
+                self.jwt_secret,
+                algorithms=[self.jwt_algo]
+            )
+            return payload
+        except jwt.ExpiredSignatureError:
+            LOG.warning("Expired app token")
+            return None
+        except jwt.InvalidTokenError as e:
+            LOG.warning(f"Invalid app token: {e}")
+            return None

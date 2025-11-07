@@ -34,13 +34,14 @@ This file purposely keeps implementation clear and easy to adapt for FastAPI
 integration. For FastAPI, import `Authenticator` and call `authenticate()` inside
 an endpoint.
 """
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
 import asyncio
+from utils import util
 
 from config.Config import REDIS_URL, debug_print_config
 from exceptions import *
@@ -132,4 +133,47 @@ async def authenticate(req: AuthRequest):
         raise HTTPException(status_code=401, detail=f"Validation failed: {pve}")
     except Exception as e:
         LOG.exception(f"Unexpected error during authentication: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+# ---------- Get user endpoint ----------
+@app.get("/get_user", response_model=AuthResponse)
+async def get_user(authorization: str = Header(None)):
+    """
+    Get user details associated with a valid app token.
+    Requires Authorization header: Bearer <app_token>
+    """
+    await init_services()
+
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid Authorization header format")
+
+    app_token = authorization.split(" ")[1].strip()
+
+    if not app_token:
+        raise HTTPException(status_code=401, detail="App token missing")
+
+    try:
+        # Validate token (decode + verify)
+        claims = await authenticator.verify_app_token(app_token)
+        claims_provider = claims["provider"]
+        claims_uid = claims["uid"]
+        if not claims:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        # Optionally, fetch additional user data from Mongo store
+        user_data = await mongo_store.get_user(provider=claims_provider, social_id=claims_uid)
+
+        if not user_data:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return AuthResponse(app_token=app_token, claims=util.normalize_mongo_doc(user_data))
+
+    except TokenStoreError as tse:
+        LOG.error(f"Token store error: {tse}")
+        raise HTTPException(status_code=500, detail="Token store error")
+    except Exception as e:
+        LOG.exception(f"Error fetching user: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
