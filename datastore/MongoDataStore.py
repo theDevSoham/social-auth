@@ -1,5 +1,5 @@
 from pymongo import ASCENDING
-from pymongo.errors import DuplicateKeyError
+from pymongo.errors import DuplicateKeyError, PyMongoError
 from pymongo import AsyncMongoClient
 from typing import Optional, Dict, Any
 from logger.Logger import LOG
@@ -42,7 +42,8 @@ class MongoDataStore:
         extra: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Insert user if not exists, otherwise return existing user.
+        Insert user if not exists. 
+        If duplicate key found, compare with existing and update only changed fields.
         """
         doc = {
             "provider": provider,
@@ -58,12 +59,49 @@ class MongoDataStore:
             doc["_id"] = result.inserted_id
             LOG.info(f"Inserted new user {social_id} ({provider})")
             return doc
-        except DuplicateKeyError:
-            # Already exists, fetch existing
-            existing = await self.get_user(provider, social_id)
-            LOG.info(f"User already exists {social_id} ({provider})")
-            raise DataError(f"User already exists with name {existing.get('name') if existing else 'unknown'}")
 
+        except DuplicateKeyError:
+            try:
+                # Fetch existing user
+                existing = await self.get_user(provider, social_id)
+                if not existing:
+                    raise Exception("Duplicate key but user not found in DB")
+
+                # Determine changed fields
+                updates = {}
+                for key, value in doc.items():
+                    if key == "_id":
+                        continue
+                    # Compare dicts deeply for 'extra'
+                    if key == "extra":
+                        if existing.get("extra", {}) != value:
+                            updates[key] = value
+                    elif existing.get(key) != value:
+                        updates[key] = value
+
+                if updates:
+                    await self.users.update_one(
+                        {"provider": provider, "social_id": social_id},
+                        {"$set": updates}
+                    )
+                    LOG.info(f"Updated user {social_id} ({provider}) fields: {list(updates.keys())}")
+                    existing.update(updates)
+                else:
+                    LOG.info(f"No updates required for user {social_id} ({provider})")
+
+                return existing
+
+            except Exception as e:
+                LOG.error(f"Error updating existing user {social_id} ({provider}): {e}")
+                raise
+
+        except PyMongoError as e:
+            LOG.error(f"Database error in upsert_user for {social_id} ({provider}): {e}")
+            raise Exception(f"Database operation failed: {str(e)}")
+
+        except Exception as e:
+            LOG.error(f"Unexpected error in upsert_user for {social_id} ({provider}): {e}")
+            raise Exception(f"Unexpected error: {str(e)}")
     async def close(self):
         if self.client:
             self.client.close()
