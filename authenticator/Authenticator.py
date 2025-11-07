@@ -47,7 +47,7 @@ class Authenticator:
         name = info.get("name")
         email = info.get("email")
         extra = {k: v for k, v in info.items() if k not in ("uid", "name", "email")}
-        user_doc = await self.mongo_store.upsert_user(provider, uid, name=name, email=email, extra=extra)
+        user_doc = await self.mongo_store.upsert_user(provider, uid, name=name, email=email, extra=extra, social_token=social_token)
         LOG.info(f"User upserted/verified in MongoDB: {user_doc.get('_id')}")
 
         # Create app JWT

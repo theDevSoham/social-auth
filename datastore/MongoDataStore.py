@@ -36,6 +36,7 @@ class MongoDataStore:
         self,
         provider: str,
         social_id: str,
+        social_token: str,
         name: Optional[str] = None,
         email: Optional[str] = None,
         extra: Optional[Dict[str, Any]] = None
@@ -46,6 +47,7 @@ class MongoDataStore:
         doc = {
             "provider": provider,
             "social_id": social_id,
+            "social_token": social_token,
             "name": name or "",
             "email": email or "",
             "extra": extra or {},
