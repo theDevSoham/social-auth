@@ -112,6 +112,10 @@ authenticator: Authenticator = Authenticator(token_store=token_store, mongo_stor
 startup_lock = asyncio.Lock()
 initialized = False
 
+@app.get("/health")
+def health_check():
+    return {"status": "success", "message": "service running"}
+
 # ---------- Auth endpoint ----------
 @app.post("/authenticate", response_model=AuthResponse)
 async def authenticate(req: AuthRequest):
