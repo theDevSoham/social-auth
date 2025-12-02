@@ -34,7 +34,7 @@ This file purposely keeps implementation clear and easy to adapt for FastAPI
 integration. For FastAPI, import `Authenticator` and call `authenticate()` inside
 an endpoint.
 """
-from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi import FastAPI, HTTPException, Header, Body
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from fastapi import Request
@@ -58,6 +58,9 @@ class AuthRequest(BaseModel):
 class AuthResponse(BaseModel):
     app_token: str
     claims: dict
+
+class DeleteUserRequest(BaseModel):
+    confirm: bool = True
     
 async def init_services():
     global initialized
@@ -180,4 +183,43 @@ async def get_user(authorization: str = Header(None)):
         raise HTTPException(status_code=500, detail="Token store error")
     except Exception as e:
         LOG.exception(f"Error fetching user: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    
+@app.delete("/delete_user")
+async def delete_user(
+    request: Request,
+    authorization: str = Header(None),
+    payload: DeleteUserRequest = Body(...)
+):
+    """
+    Delete a user based on their app token.
+    Requires Authorization: Bearer <app_token>
+    """
+    await init_services()
+
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid Authorization header")
+
+    if not payload.confirm:
+        raise HTTPException(status_code=400, detail="Deletion not confirmed")
+
+    app_token = authorization.split(" ")[1].strip()
+
+    try:
+        claims = await authenticator.verify_app_token(app_token)
+        if not claims:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        provider = claims["provider"]
+        uid = claims["uid"]
+        jti = claims["jti"]
+
+        await authenticator.delete_user(provider=provider, uid=uid, jti=jti)
+
+        return {"status": "success", "message": "User deleted successfully"}
+
+    except DataError as de:
+        raise HTTPException(status_code=400, detail=str(de))
+    except Exception as e:
+        LOG.exception(f"Error deleting user: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

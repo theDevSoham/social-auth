@@ -3,7 +3,7 @@ from config.Config import AUTH_JWT_SECRET, AUTH_JWT_ALGORITHM, AUTH_JWT_EXP_SECO
 from utils.util import sha256_hex, async_retry
 from utils.http_client import get_aiohttp_session
 from typing import Dict, Any
-from exceptions import ProviderValidationError
+from exceptions import ProviderValidationError, DataError
 from social_media_adapter_functions import *
 from datastore.MongoDataStore import MongoDataStore
 from logger.Logger import LOG
@@ -99,3 +99,18 @@ class Authenticator:
         except jwt.InvalidTokenError as e:
             LOG.warning(f"Invalid app token: {e}")
             return None
+        
+    async def delete_user(self, provider: str, uid: str, jti: str):
+        # Delete from Mongo
+        deleted = await self.mongo_store.delete_user(provider, uid)
+        if not deleted:
+            raise DataError("User not found or already deleted")
+
+        # Also delete from token store (optional but recommended)
+        try:
+            await self.token_store.delete(jti=jti)
+        except Exception:
+            # token store cleanup failures should NOT block the delete
+            pass
+
+        return True

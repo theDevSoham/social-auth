@@ -101,6 +101,86 @@ class TokenStore:
                 await self._sqlite_conn.commit()
                 return None
             return json.loads(payload_json)
+        
+    # ---------------------------------------------------------------------
+    # DELETE (single token)
+    # ---------------------------------------------------------------------
+    async def delete(self, jti: str):
+        """
+        Delete one token by JTI.
+        """
+        if self._kv:
+            try:
+                deleted = self._kv.delete(jti)
+                print(f"Deleted Key: {deleted}")
+                return
+            except Exception as e:
+                LOG.error(f"Valkey delete failed: {str(e)}")
+                raise TokenStoreError(e)
+
+        try:
+            await self._sqlite_conn.execute("DELETE FROM tokens WHERE jti = ?", (jti,))
+            await self._sqlite_conn.commit()
+        except Exception as e:
+            LOG.error(f"SQLite delete failed: {str(e)}")
+            raise TokenStoreError(e)
+
+    # ---------------------------------------------------------------------
+    # CLEANUP EXPIRED (SQLite only)
+    # ---------------------------------------------------------------------
+    async def cleanup_expired(self):
+        """
+        Removes expired tokens from SQLite.
+        No-op for Valkey because Redis handles TTL automatically.
+        """
+        if self._kv:
+            return  # Redis already handles TTL expiry
+
+        try:
+            now = int(time.time())
+            await self._sqlite_conn.execute(
+                "DELETE FROM tokens WHERE expires_at <= ?", (now,)
+            )
+            await self._sqlite_conn.commit()
+            LOG.info("SQLite token cleanup complete")
+        except Exception as e:
+            LOG.error(f"SQLite cleanup failed: {str(e)}")
+            raise TokenStoreError(e)
+
+    # ---------------------------------------------------------------------
+    # OPTIONAL: CLEANUP BY USER (provider + uid → delete all tokens)
+    # ---------------------------------------------------------------------
+    async def cleanup_user(self, provider: str, uid: str):
+        """
+        Removes all tokens belonging to a given user.
+        Requires tokens to include provider + uid inside payload.
+        """
+        if self._kv:
+            # Valkey doesn't have scan cursor by default — add only if needed
+            return
+
+        try:
+            cur = await self._sqlite_conn.execute(
+                "SELECT jti, payload FROM tokens"
+            )
+            rows = await cur.fetchall()
+
+            to_delete = []
+            for jti, payload_json in rows:
+                try:
+                    data = json.loads(payload_json)
+                    if data.get("provider") == provider and data.get("uid") == uid:
+                        to_delete.append(jti)
+                except:
+                    pass
+
+            for jti in to_delete:
+                await self.delete(jti)
+
+            LOG.info(f"Cleaned up {len(to_delete)} tokens for user {provider}:{uid}")
+
+        except Exception as e:
+            raise TokenStoreError(f"Cleanup user failed: {e}")
 
     async def close(self):
         if self._kv:

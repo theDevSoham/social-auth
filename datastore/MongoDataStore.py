@@ -102,6 +102,17 @@ class MongoDataStore:
         except Exception as e:
             LOG.error(f"Unexpected error in upsert_user for {social_id} ({provider}): {e}")
             raise Exception(f"Unexpected error: {str(e)}")
+        
+    async def delete_user(self, provider: str, social_id: str):
+        try:
+            result = await self.users.delete_one({
+                "provider": provider,
+                "social_id": social_id
+            })
+            return result.deleted_count > 0
+        except Exception as e:
+            raise DataError(f"Failed to delete user: {e}")
+    
     async def close(self):
         if self.client:
             self.client.close()
