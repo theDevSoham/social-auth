@@ -243,7 +243,7 @@ async def delete_user_by_id(
     if not payload.confirm:
         raise HTTPException(status_code=400, detail="Deletion not confirmed")
     
-    if not payload.provider or payload.user_id:
+    if not payload.provider or not payload.user_id:
         raise HTTPException(status_code=400, detail="Provider and user id are required")
 
     try:
