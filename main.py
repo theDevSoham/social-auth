@@ -251,6 +251,9 @@ async def delete_user_by_id(
         await authenticator.delete_user_by_id(user_id=payload.user_id, provider=payload.provider)
 
         return {"status": "success", "message": f"User {payload.user_id} deleted successfully"}
+    
+    except DataError as de:
+        raise HTTPException(status_code=400, detail=str(de))
 
     except Exception as e:
         LOG.exception(f"Error deleting user {payload.user_id}: {e}")
