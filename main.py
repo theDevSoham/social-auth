@@ -61,6 +61,11 @@ class AuthResponse(BaseModel):
 
 class DeleteUserRequest(BaseModel):
     confirm: bool = True
+
+class DeleteUserByIdRequest(BaseModel):
+    user_id: str
+    provider: str
+    confirm: bool
     
 async def init_services():
     global initialized
@@ -222,4 +227,33 @@ async def delete_user(
         raise HTTPException(status_code=400, detail=str(de))
     except Exception as e:
         LOG.exception(f"Error deleting user: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    
+@app.delete("/delete_user_by_id")
+async def delete_user_by_id(
+    request: Request,
+    payload: DeleteUserByIdRequest = Body(...)
+):
+    """
+    Delete a user based on their user_id.
+    Requires `confirm=True` in the request body.
+    """
+    await init_services()
+
+    if not payload.confirm:
+        raise HTTPException(status_code=400, detail="Deletion not confirmed")
+    
+    if not payload.provider or payload.user_id:
+        raise HTTPException(status_code=400, detail="Provider and user id are required")
+
+    try:
+        # Call your authenticator / database deletion logic
+        result = await authenticator.delete_user_by_id(user_id=payload.user_id, provider=payload.provider)
+        if not result:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return {"status": "success", "message": f"User {payload.user_id} deleted successfully"}
+
+    except Exception as e:
+        LOG.exception(f"Error deleting user {payload.user_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

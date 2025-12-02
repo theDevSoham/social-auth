@@ -114,3 +114,28 @@ class Authenticator:
             pass
 
         return True
+    
+    async def delete_user_by_id(self, user_id: str, provider: str):
+        """
+        Delete a user based on user_id.
+        Also cleans up tokens if applicable.
+        """
+
+        data = await self.mongo_store.get_user(provider=provider, social_id=user_id)
+
+        if not data:
+            return
+
+        # Delete from MongoDB
+        deleted = await self.mongo_store.delete_user(provider=provider, social_id=user_id)
+        if not deleted:
+            raise DataError("User not found or already deleted")
+
+        # # Optional: delete all tokens associated with this user
+        # try:
+        #     await self.token_store.delete_by_user_id(user_id)
+        # except Exception:
+        #     # token store cleanup failures should NOT block deletion
+        #     pass
+
+        return True
