@@ -124,7 +124,7 @@ class Authenticator:
         data = await self.mongo_store.get_user(provider=provider, social_id=user_id)
 
         if not data:
-            return
+            raise DataError("User not found or already deleted")
 
         # Delete from MongoDB
         deleted = await self.mongo_store.delete_user(provider=provider, social_id=user_id)
