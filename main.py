@@ -248,9 +248,7 @@ async def delete_user_by_id(
 
     try:
         # Call your authenticator / database deletion logic
-        result = await authenticator.delete_user_by_id(user_id=payload.user_id, provider=payload.provider)
-        if not result:
-            raise HTTPException(status_code=404, detail="User not found")
+        await authenticator.delete_user_by_id(user_id=payload.user_id, provider=payload.provider)
 
         return {"status": "success", "message": f"User {payload.user_id} deleted successfully"}
 
