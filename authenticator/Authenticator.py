@@ -10,7 +10,7 @@ from logger.Logger import LOG
 import uuid
 import jwt
 import time
-import aiohttp
+import secrets
 
 # ---------- Authenticator ----------
 
@@ -130,6 +130,15 @@ class Authenticator:
         deleted = await self.mongo_store.delete_user(provider=provider, social_id=user_id)
         if not deleted:
             raise DataError("User not found or already deleted")
+        
+        # saving cnf code for future reference
+        confirmation_code = secrets.token_hex(16)
+        await self.mongo_store.upsert_deletion(
+            provider=provider, 
+            social_id=user_id, 
+            cnf=confirmation_code, 
+            status="deleted"
+        )
 
         # # Optional: delete all tokens associated with this user
         # try:
@@ -138,4 +147,4 @@ class Authenticator:
         #     # token store cleanup failures should NOT block deletion
         #     pass
 
-        return True
+        return {"status": True, "cnf": confirmation_code}

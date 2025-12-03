@@ -41,6 +41,7 @@ logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s %(levelname)s %(message
 MONGO_URL: str = os.getenv("MONGO_URL", "mongodb://localhost:27017")
 DB_NAME: str = os.getenv("MONGO_DB_NAME", "")
 USERS_COLLECTION: str = os.getenv("USERS_COLLECTION", "")
+DELETED_USERS_COLLECTION: str = os.getenv("DELETED_USERS_COLLECTION", "")
 
 # ---------- Helper for Debug ----------
 def debug_print_config():
@@ -60,5 +61,6 @@ def debug_print_config():
     print(f"  MONGO_URL = {mask(MONGO_URL)}")
     print(f"  DB_NAME = {mask(DB_NAME)}")
     print(f"  USERS_COLLECTION = {mask(USERS_COLLECTION)}")
+    print(f"  DELETED_USERS_COLLECTION = {mask(DELETED_USERS_COLLECTION)}")
     print(f"  TWITTER_OAUTH2_ENABLE = {TWITTER_OAUTH2_ENABLE}")
     print(f"  SQLITE_PATH = {SQLITE_PATH}")

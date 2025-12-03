@@ -34,7 +34,7 @@ This file purposely keeps implementation clear and easy to adapt for FastAPI
 integration. For FastAPI, import `Authenticator` and call `authenticate()` inside
 an endpoint.
 """
-from fastapi import FastAPI, HTTPException, Header, Body
+from fastapi import FastAPI, HTTPException, Header, Body, Query
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from fastapi import Request
@@ -248,9 +248,13 @@ async def delete_user_by_id(
 
     try:
         # Call your authenticator / database deletion logic
-        await authenticator.delete_user_by_id(user_id=payload.user_id, provider=payload.provider)
+        resp = await authenticator.delete_user_by_id(user_id=payload.user_id, provider=payload.provider)
 
-        return {"status": "success", "message": f"User {payload.user_id} deleted successfully"}
+        return {
+            "status": "success", 
+            "message": f"User {payload.user_id} deleted successfully", 
+            "cnf": resp.get("cnf", "")
+        }
     
     except DataError as de:
         raise HTTPException(status_code=400, detail=str(de))
@@ -258,3 +262,37 @@ async def delete_user_by_id(
     except Exception as e:
         LOG.exception(f"Error deleting user {payload.user_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+    
+@app.get("/deletion_status")
+async def user_deletion_status(cnf_id: str = Query(..., description="Confirmation code")):
+    try:
+        # check if user was already deleted
+        deleted_user = await mongo_store.get_deleted_user(cnf=cnf_id)
+
+        if deleted_user:
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "status": "deleted",
+                    "message": "User account has been deleted."
+                }
+            )
+
+        # not found anywhere
+        return JSONResponse(
+            status_code=404,
+            content={
+                "status": "not_found",
+                "message": "No deletion request found for this confirmation ID."
+            }
+        )
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": "Internal server error",
+                "details": str(e)
+            }
+        )
